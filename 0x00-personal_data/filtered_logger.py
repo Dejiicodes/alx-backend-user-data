@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Module for filtering and logging sensitive data."""
+"""Filtered Logger Module
+
+This module contains functions and classes for filtering and logging
+sensitive personal data, such as PII (Personally Identifiable Information).
+"""
 
 from typing import List
 import re
@@ -13,19 +17,24 @@ def filter_datum(
         redaction: str,
         message: str,
         separator: str) -> str:
-    """Redacts specified fields in a log message.
+    """Redacts sensitive information from a log message.
 
     Args:
-        fields: A list of strings representing fields to redact.
-        redaction: The string to replace the sensitive data with.
-        message: The log message as a string.
-        separator: The separator used to delineate fields in the message.
+        fields (List[str]): A list of fields to redact.
+        redaction (str): The string that will replace the sensitive data.
+        message (str): The log message to be filtered.
+        separator (str): The character separating fields in the log message.
 
     Returns:
-        A string with the specified fields redacted.
+        str: The log message with the sensitive fields redacted.
     """
-    pattern = '|'.join(f'{field}=[^{separator}]*' for field in fields)
-    return re.sub(pattern, lambda match: match.group(0).split('=')[0] + f'={redaction}', message)
+    for field in fields:
+        message = re.sub(
+            f"{field}=[^{separator}]*",
+            f"{field}={redaction}",
+            message
+        )
+    return message
 
 
 class RedactingFormatter(logging.Formatter):
@@ -36,12 +45,23 @@ class RedactingFormatter(logging.Formatter):
     SEPARATOR = ";"
 
     def __init__(self, fields: List[str]):
-        """Initialize the formatter with fields to redact."""
+        """Initializes the formatter with fields to redact.
+
+        Args:
+            fields (List[str]): A list of fields to redact.
+        """
         super(RedactingFormatter, self).__init__(self.FORMAT)
         self.fields = fields
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format the log record by redacting sensitive fields."""
+        """Formats the log record by redacting sensitive fields.
+
+        Args:
+            record (logging.LogRecord): The log record to be formatted.
+
+        Returns:
+            str: The formatted log record with sensitive fields redacted.
+        """
         return filter_datum(
             self.fields,
             self.REDACTION,
@@ -50,22 +70,25 @@ class RedactingFormatter(logging.Formatter):
         )
 
 
-PII_FIELDS = ("name", "email", "phone", "ssn", "password")
+PII_FIELDS = ["name", "email", "phone", "ssn", "password"]
 
 
 def get_logger() -> logging.Logger:
-    """Creates and returns a logger with a redacting formatter.
+    """Creates and configures a logger for logging user data.
 
     Returns:
-        A logging.Logger instance configured with a RedactingFormatter.
+        logging.Logger: A logger instance configured with a
+                        RedactingFormatter.
     """
     logger = logging.getLogger("user_data")
     logger.setLevel(logging.INFO)
     logger.propagate = False
+
     stream_handler = logging.StreamHandler()
     formatter = RedactingFormatter(fields=PII_FIELDS)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
+
     return logger
 
 
@@ -73,7 +96,7 @@ def get_db() -> mysql.connector.connection.MySQLConnection:
     """Establishes a connection to the MySQL database.
 
     Returns:
-        A mysql.connector.connection.MySQLConnection object.
+        mysql.connector.connection.MySQLConnection: A MySQL database connection.
     """
     return mysql.connector.connect(
         host=os.getenv("PERSONAL_DATA_DB_HOST", "localhost"),
@@ -84,14 +107,18 @@ def get_db() -> mysql.connector.connection.MySQLConnection:
 
 
 def main():
-    """Main function to fetch and log data from the database."""
+    """Main function that retrieves data from the database and logs it."""
     db_connection = get_db()
     cursor = db_connection.cursor()
     cursor.execute("SELECT * FROM users;")
     logger = get_logger()
 
     for row in cursor:
-        message = f"name={row[0]}; email={row[1]}; phone={row[2]}; ssn={row[3]}; password={row[4]}; ip={row[5]}; last_login={row[6]}; user_agent={row[7]};"
+        message = (
+            f"name={row[0]}; email={row[1]}; phone={row[2]}; "
+            f"ssn={row[3]}; password={row[4]}; ip={row[5]}; "
+            f"last_login={row[6]}; user_agent={row[7]};"
+        )
         logger.info(message)
 
     cursor.close()
@@ -100,4 +127,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
