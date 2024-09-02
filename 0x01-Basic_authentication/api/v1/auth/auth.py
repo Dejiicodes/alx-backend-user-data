@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
-""" Auth Class """
+"""
+API authentication module
+"""
 
 from flask import request
 from typing import List, TypeVar
 
 
 class Auth:
-    """ Auth Class """
+    """ Authentication """
 
     def require_auth(self, path: str, excluded_paths: List[str]) -> bool:
-        """ Require auth method """
+        """ Checks if API routes require authentication """
         if path is None or excluded_paths is None or len(excluded_paths) == 0:
             return True
-        for i in range(len(excluded_paths)):
-            if excluded_paths[i].rstrip('/') == path.rstrip('/'):
-                return False
-        return True
+        if path[-1] != '/':
+            path += '/'
+        if path in excluded_paths:
+            return False
+        else:
+            return True
 
     def authorization_header(self, request=None) -> str:
-        """ Authorization header method """
-        if request is None:
+        """ Checks if Authorization request header is present
+        & contains values """
+        if request is None or "Authorization" not in request.headers:
             return None
-        if "Authorization" in request.headers:
-            return request.headers["Authorization"]
+        else:
+            return request.headers.get('Authorization')
 
     def current_user(self, request=None) -> TypeVar('User'):
-        """ Current user method """
+        """ placeholder """
         return None
